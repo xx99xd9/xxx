@@ -1,1 +1,1 @@
-- GET /api/habits
+- GET /api/v2/habits - список привычек
