@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16
+    container_name: library_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: library_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - library_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d library_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  catalog-service:
+    build: ./catalog-service
+    container_name: catalog_service
+    environment:
+      DB_CONNECTION: "Host=db;Port=5432;Database=library_db;Username=postgres;Password=password123"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - library_net
+
+  loan-service:
+    build: ./loan-service
+    container_name: loan_service
+    environment:
+      DB_CONNECTION: "Host=db;Port=5432;Database=library_db;Username=postgres;Password=password123"
+      CATALOG_URL: "http://catalog-service:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+    networks:
+      - library_net
+
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway_service
+    ports:
+      - "8080:8080"
+    environment:
+      CATALOG_URL: "http://catalog-service:8080"
+      LOAN_URL: "http://loan-service:8080"
+    depends_on:
+      - catalog-service
+      - loan-service
+    networks:
+      - library_net
+
+volumes:
+  db_data:
+
+networks:
+  library_net:
+    driver: bridge
